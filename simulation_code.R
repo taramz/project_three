@@ -184,6 +184,7 @@ for (i in 1:nrow(full_grid)) {
                      BPMEDS = BP_MEDS, CURSMOKE = CURSMOKE, SEX = SEX)
   
   # Calculate probability of diabetes using the diabetes model
+  # Have to use cursmoke as y variable to get the model matrix
   x_vars <- model.matrix(CURSMOKE ~ AGE + HDLC + BPMEDS, data = data)
   probs <- x_vars %*% coef(diabetes_mod)
   probs <- exp(probs)/(1 + exp(probs))
