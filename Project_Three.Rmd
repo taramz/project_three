@@ -30,13 +30,13 @@ The data generation process incorporates missing variables, potentially contribu
 
 ### Introduction
 
-In the pursuit of empirical investigations, the focus often extends to two distinct populations: the target population and the study population. While an ideal scenario presupposes their congruence, this alignment is frequently elusive. The construction of predictive models introduces a notable challenge, given that the model is predicated upon the study population but is intended for application to the target population. Discrepancies in characteristics between these populations can substantially compromise the model's efficacy when deployed on the target population. Hence, an evaluation of predictive accuracy alone proves insufficient; the aspect of transportability assumes paramount importance [@steingrimsson2023transporting].
+In the pursuit of empirical investigations, the focus often extends to two distinct populations: the target population and the study population.In an ideal situation, the assumption is that they align perfectly, but achieving this alignment is often difficult to attain. The construction of predictive models introduces a notable challenge, given that the model is predicated upon the study population but is intended for application to the target population. Discrepancies in characteristics between these populations can substantially compromise the model's efficacy when deployed on the target population. Hence, an evaluation of predictive accuracy alone proves insufficient; the aspect of transportability assumes paramount importance [@steingrimsson2023transporting].
 
 To underscore the significance of transportability analysis, we draw upon datasets derived from two disparate sources: The Framingham Study and the National Health & Nutrition Examination Survey (NHANES). Initiated by the United States Public Health Service in 1948, the Framingham Study represents an extensive observational cohort investigation dedicated to exploring the epidemiology and risk factors associated with cardiovascular disease (CVD). Evolving into a longitudinal study spanning three generations, this initiative meticulously captures data pertaining to biological and lifestyle risk factors, alongside monitoring cardiovascular, neurological, and other disease outcomes [@Framingham].
 
 The inaugural cohort of the Framingham Study comprised 5,209 participants aged 28-62, representing two-thirds of the adult populace in Framingham, MA. Subsequently, an offspring cohort was assembled, with a third generation recruited as of 2002. Each participant underwent comprehensive evaluations encompassing medical histories, physician examinations, laboratory tests for vascular risk factors, and, in some instances, cognitive assessments and brain imaging [@Framingham].
 
-In contrast, the NHANES, administered by the National Center for Health Statistics (NCHS), constitutes a program of studies aimed at evaluating the health and nutritional status of both adults and children in the United States [@nhanes]. A continuous program with evolving focal points to address contemporary needs, NHANES integrates self-reported data on demographic, socioeconomic, dietary, and health-related factors. Furthermore, it encompasses a comprehensive examination entailing medical, dental, and psychological metrics.
+In contrast, the NHANES, administered by the National Center for Health Statistics (NCHS), constitutes a program of studies aimed at evaluating the health and nutritional status of both adults and children in the United States. A continuous program with evolving focal points to address contemporary needs, NHANES integrates self-reported data on demographic, socioeconomic, dietary, and health-related factors. Furthermore, it encompasses a comprehensive examination entailing medical, dental, and psychological metrics [@nhanes].
 
 The Framingham Study, being a longitudinal exploration enriched with cardiovascular outcome data, facilitates the construction of models predicting an individual's predisposition to cardiovascular disease (CVD). Conversely, the NHANES data lacks information on cardiovascular outcomes. In this context, the pivotal inquiry emerges: To what extent can we prognosticate the likelihood of cardiovascular disease in the NHANES population utilizing a model constructed on the Framingham data?
 
@@ -70,7 +70,7 @@ framingham_df$SYSBP_T <- ifelse(framingham_df$BPMEDS == 1,
                                 framingham_df$SYSBP, 0)
 
 # Looking at risk within 15 years - remove censored data
-dim(framingham_df)
+#dim(framingham_df)
 framingham_df <- framingham_df %>%
   filter(!(CVD == 0 & TIMECVD <= 365*15)) %>%
   dplyr::select(-c(TIMECVD))
@@ -140,9 +140,9 @@ df_2017 <- bpx_2017 %>%
 
 ### Data
 
-Preceding the commencement of the transportability analysis, an exploratory data analysis was undertaken. The interrelations among numeric columns within the National Health & Nutrition Examination Survey (NHANES) data are illustrated in Figure 1. It is discerned that systolic blood pressure exhibits a pronounced correlation with age, diastolic blood pressure, and body mass index (BMI). Furthermore, a notable correlation is observed between total cholesterol and systolic blood pressure, along with high-density lipoprotein cholesterol (HDLC).
+Preceding the commencement of the transportability analysis, an exploratory data analysis was undertaken. The interrelations among numeric columns within the NHANES data are illustrated in Figure 1. It is discerned that systolic blood pressure exhibits a pronounced correlation with age, diastolic blood pressure, and body mass index (BMI). Furthermore, a notable correlation is observed between total cholesterol and systolic blood pressure, along with high-density lipoprotein cholesterol (HDLC).
 
-```{r, fig.height = 5}
+```{r, fig.height = 4}
 library(corrplot)
 numeric_nhanes <- df_2017 %>%
   dplyr::select(SYSBP, DIABP, AGE, BMI, HDLC, TOTCHOL)
@@ -157,7 +157,7 @@ corrplot(cor(numeric_nhanes),
 
 In Figure 2, the inter-column correlations within the numeric variables of the Framingham data are presented. Notably, akin to the NHANES data, discernible correlations are evident between systolic blood pressure and diastolic blood pressure, age, and BMI. However, it is noteworthy that the strength of correlations for other variables in the Framingham data appears comparatively less pronounced than those observed in the NHANES dataset. This discrepancy underscores a substantive distinction between the two datasets.
 
-```{r, fig.height = 5}
+```{r, fig.height = 4}
 numeric_fram <- framingham_df %>%
   dplyr::select(SYSBP, DIABP, AGE, BMI, HDLC, TOTCHOL)
 numeric_fram <- numeric_fram[complete.cases(numeric_fram),]
@@ -386,7 +386,7 @@ The ADEMP framework, an invaluable tool for conceptualizing simulation challenge
 
 **Aims:** The objective of this endeavor is to employ summary-level data adeptly to simulate individual-level data representative of our target population, constituting the demographic substratum underpinning the NHANES survey data.
 
-**Data Generating Mechanism:** Data generation was dichotomized by gender, maintaining a uniform procedural methodology with divergent parameter values. Notably, the interdependence between HDLC and cholesterol prompted their simulation through a multivariate normal distribution, allowing for varied associations. Age, characterized by a uniform distribution within the range of 28 to 62, was generated accordingly. Systolic blood pressure followed a normal distribution. The binary variable for smoking was modeled using a binomial distribution, employing probabilities extracted from summary tables. The variable denoting blood pressure medication usage was contingent on varying systolic blood pressure thresholds, ranging from 120 to 140, referencing criteria elucidated by the Mayo Clinic [@mayo]. A predictive model for diabetes, predicated on age, HDLC, and blood pressure medication status, was constructed employing NHANES data and subsequently deployed to generate diabetes status for each data point. To circumvent computational constraints, 500 iterations were executed for each permutation of parameter variations. A seed of 1 was used.
+**Data Generating Mechanism:** Data generation was dichotomized by gender, maintaining a uniform procedural methodology with divergent parameter values. Notably, the interdependence between HDLC and cholesterol prompted their simulation through a multivariate normal distribution, allowing for varied associations. Age, characterized by a uniform distribution within the range of 28 to 62, was generated accordingly. The systolic blood pressure, despite exhibiting a subtle skewness, was represented through a normal distribution model. The binary variable for smoking was modeled using a binomial distribution, employing probabilities extracted from summary tables. The variable denoting blood pressure medication usage was contingent on varying systolic blood pressure thresholds, ranging from 120 to 140, referencing criteria elucidated by the Mayo Clinic [@mayo]. A predictive model for diabetes, predicated on age, HDLC, and blood pressure medication status, was constructed employing NHANES data and subsequently deployed to generate diabetes status for each data point. To circumvent computational constraints, 500 iterations were executed for each permutation of parameter variations. A seed of 1 was used.
 
 **Estimand:** The estimand, denoted as $\hat{\psi}_{\hat{\beta}}$, assumes the form of the Brier Risk estimator, serving as a metric to gauge model performance within the target population.
 

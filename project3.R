@@ -1,6 +1,8 @@
 library(riskCommunicator)
 library(tidyverse)
 library(tableone)
+library(ggplot2)
+library(tidyverse)
 
 data("framingham")
 
@@ -115,6 +117,12 @@ df_2017 %>%
   filter(AGE >= 28 & AGE <= 62) %>%
   group_by(SEX) %>%
   summarise(count = n())
+
+complete_cases <- df_2017[complete.cases(df_2017),]
+eligible_2017 <- complete_cases %>%
+  filter(AGE >= 28 & AGE <= 62) %>%
+  dplyr::select(c("SEX", "TOTCHOL", "AGE", "BMI", "SYSBP", "HDLC", 
+                  "CURSMOKE", "BPMEDS", "DIABETES", "DIABP"))
 
 # How to handle missing data
 #6000 people who answered questionnaire who answered the questionnaire themself
