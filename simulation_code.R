@@ -144,55 +144,6 @@ brier_score <- function(data, sex) {
   }
 }
 
-# Initialize empty vector for male and female Brier scores for each imputed dataset
-scores_male <- c()
-scores_female <- c()
-auc_male <- c()
-auc_female <- c()
-
-auc <- function(data, sex) {
-  #' Function to calculate the AUC by sex
-  #' @param data, the data to analyze
-  #' @param sex, the sex to calculate the AUC for
-  #' 
-  #' @return AUC value
-  
-  data <- data %>%
-    filter(SEX == sex & S == 1)
-  
-  if (sex == 1) {
-    data$pred <- predict(mod_men, type = 'response')
-  } else {
-    data$pred <- predict(mod_women, type = 'response')
-  }
-  
-  num <- 0
-  denom <- 0
-
-  for (i in 1:nrow(data)) {
-    for (j in 1:nrow(data)) {
-      
-      if (i != j) {
-        wt <- ((1 - data$weights[i]) * (1 - data$weights[j]))/(data$weights[i] * data$weights[j])
-        
-        indicator_n <- ifelse((data$pred[i] > data$pred[j]) & 
-          (data$CVD[i] == 1 & data$CVD[j] == 0) &
-          (data$S[i] == 1 & data$S[j] == 1), 1, 0)
-        
-        indicator_d <- ifelse((data$CVD[i] == 1 & data$CVD[j] == 0) &
-          (data$S[i] == 1 & data$S[j] == 1), 1, 0)
-
-        
-        num <- num + (wt * indicator_n)
-        denom <- denom + (wt * indicator_d)
-      }
-      
-    }
-  }
-  return(num/denom)
-}
-
-
 # Loop through each imputed dataset, calculate the weights, and then the Brier scores
 for (i in 1:m) {
   
@@ -216,17 +167,19 @@ for (i in 1:m) {
   weights <- calculate_weights(combined_df %>% dplyr::select(-CVD,SEX))
   combined_df <- cbind(combined_df, weights)
   
-  # Calculate the brier and AUC scores by gender
+  # Calculate the brier scores by gender
   scores_male <- c(scores_male, brier_score(combined_df, 1))
   scores_female <- c(scores_female, brier_score(combined_df, 2))
-  
-  #auc_male <- c(auc_male, auc(combined_df, 1))
-  #auc_female <- c(auc_female, auc(combined_df, 2))
   
 }
 
 cov_mat <- function(sd1, sd2, rho) {
-  
+  #' Calculate the covariance matrix provided two standard deviations and the correlation
+  #' @param sd1, the standard deviation of the first variable
+  #' @param sd2, the standard deviation of the second variable
+  #' @param rho, the correlation between the two variables
+  #' 
+  #' @return matrix, the variance-covariance matrix  
   cov_mat = matrix(0, nrow = 2, ncol = 2)
   cov_mat[1,1] <- sd1^2
   cov_mat[1,2] <- rho * sd1 * sd2
@@ -249,7 +202,6 @@ rho <- seq(0,0.90,0.1) # Varied Correlations
 thresholds <- seq(120, 140, 5) # SYSBP thresholds
 full_grid <- expand.grid(rho = rho, thresh = thresholds, iter = seq(1,n_sim))
 full_grid$brier <- NA
-
 mean_vals <- as.data.frame(t(apply(X = nhanes_men, MARGIN = 2, FUN = mean)))
 sd_vals <- as.data.frame(t(apply(X = nhanes_men, MARGIN = 2, FUN = sd)))
 for (i in 1:nrow(full_grid)) {
@@ -324,7 +276,6 @@ thresholds <- seq(120, 140, 5) # SYSBP thresholds
 full_grid <- expand.grid(rho = rho, thresh = thresholds, iter = seq(1,n_sim))
 full_grid$brier <- NA
 sds <- c(sd(nhanes_women$HDLC, na.rm=TRUE), sd(nhanes_women$TOTCHOL, na.rm = TRUE))
-#full_grid$auc <- NA
 for (i in 1:nrow(full_grid)) {
   print(i)
   

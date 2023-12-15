@@ -315,7 +315,6 @@ calculate_weights <- function(data) {
 #' @return vector of weights
 
   model <- glm(S ~ ., data = data, family = "binomial")
-  #log(HDLC)+log(TOTCHOL)+log(AGE)+log(SYSBP_UT+1)+log(SYSBP_T+1)+CURSMOKE+DIABETES
   S1 <- predict(model, type = "response")
   
   return((1-S1)/S1)
@@ -623,8 +622,15 @@ Employing the previously defined correlation and blood pressure threshold values
 From Table 5, we are able to see that the Brier score for the female data is very close to the true Brier score, which corroborates what is illustrated in Figure 6. Similarly, the Brier score for the male data performs slightly worse. Upon examination of the summary statistics for the simulated data, as shown in Table 6, we see that the prevalence of blood pressure medication and diabetes are significantly lower in the simulated data than in the actual data.
 
 ```{r}
+# Using the optimal parameters (rho = 0.4, threshold = 140) simulate the data
 set.seed(1)
 cov_mat <- function(sd1, sd2, rho) {
+  #' Calculate the covariance matrix provided two standard deviations and the correlation
+  #' @param sd1, the standard deviation of the first variable
+  #' @param sd2, the standard deviation of the second variable
+  #' @param rho, the correlation between the two variables
+  #' 
+  #' @return matrix, the variance-covariance matrix
   
   cov_mat = matrix(0, nrow = 2, ncol = 2)
   cov_mat[1,1] <- sd1^2
@@ -635,8 +641,12 @@ cov_mat <- function(sd1, sd2, rho) {
   return(cov_mat)
   
 }
+
+# Load in diabetes model
 diabetes_mod <- readRDS('diabetes_mod.rds')
 
+
+# Calculate the values for both men and women
 nhanes_men <- eligible_2017 %>% filter(AGE >= 30 & SEX == 1)
 nhanes_women <- eligible_2017 %>% filter(AGE >= 30 & SEX == 2)
 
@@ -690,20 +700,25 @@ probs <- x_vars %*% coef(diabetes_mod)
 probs <- exp(probs)/(1 + exp(probs))
 data_w$DIABETES <- to_vec(for(i in 1:length(probs)) rbinom(1,1,probs[i]))
 
+# Bind both men and women data together
 data <- rbind(data_m, data_w)
 
 data$CVD <- NA
-  
+
+# Add in same variables in the Framingham data
 data$SYSBP_UT <- ifelse(data$BPMEDS == 0, data$SYSBP, 0)
 data$SYSBP_T <- ifelse(data$BPMEDS ==1, data$SYSBP, 0)
 
 framingham_df <- framingham_df %>%
   dplyr::select('HDLC', 'TOTCHOL', 'SYSBP', 'AGE', 'BPMEDS', 'CURSMOKE', 'SEX', 'DIABETES', 'CVD', 'SYSBP_UT', 'SYSBP_T')
-  
+
+# Combine data and create an indicator for if Framingham data or not
 combined_df <- rbind(framingham_df, data) %>%
 mutate(S = case_when(is.na(CVD) ~ 0,
                        TRUE ~ 1))
-  
+
+# Calculate the weights and then the Brier score
+# Then display in a table
 weights <- calculate_weights(combined_df %>% dplyr::select(-CVD))
 combined_df <- cbind(combined_df, weights)
   
@@ -718,6 +733,7 @@ kbl(brier_scores_sim, booktabs = T, escape = F, caption = 'Brier Scores of Best 
 ```
 
 ```{r}
+# Summary table by gender
 data %>%
   mutate(SEX = case_when(SEX == 1 ~ 'Male',
                          SEX == 2 ~ 'Female')) %>%
