@@ -2,8 +2,10 @@
 title: "Project Three"
 author: "Tara Amruthur"
 date: "2023-11-27"
-output: pdf_document
-bibliography: references.bib 
+output:
+  pdf_document: default
+  word_document: default
+bibliography: references.bib
 ---
 
 ```{r setup, include=FALSE}
@@ -24,13 +26,13 @@ Population disparities between Framingham and NHANES underscore the imprudence o
 
 The ADEMP framework guides simulation considerations, encompassing aim, data generating mechanism, estimand, methods, and performance measures. Simulation involves diverse parameter variations for gender-specific data generation, aiming to replicate NHANES demographics.
 
-The evaluation of simulated datasets using bias and mean squared error reveals nuanced differences between genders. Optimal covariance values for minimizing bias and MSE differ for men and women. The Brier score comparison and summary statistics show congruence with NHANES for women but slight discrepancies for men, potentially attributed to data variability.
+The evaluation of simulated datasets using bias and mean squared error reveals nuanced differences between genders. Optimal correlation and blood pressure threshold values for minimizing bias and MSE are the same for men and women. The Brier score comparison and summary statistics show congruence with NHANES for women but slight discrepancies for men, potentially attributed to data variability.
 
 The data generation process incorporates missing variables, potentially contributing to disparities in Brier scores. Computational constraints limit simulations, raising the possibility of unstable estimates. These considerations highlight areas for refining the data generation process and underscore the importance of meticulous transportability analysis in model development and application across diverse populations.
 
 ### Introduction
 
-In the pursuit of empirical investigations, the focus often extends to two distinct populations: the target population and the study population.In an ideal situation, the assumption is that they align perfectly, but achieving this alignment is often difficult to attain. The construction of predictive models introduces a notable challenge, given that the model is predicated upon the study population but is intended for application to the target population. Discrepancies in characteristics between these populations can substantially compromise the model's efficacy when deployed on the target population. Hence, an evaluation of predictive accuracy alone proves insufficient; the aspect of transportability assumes paramount importance [@steingrimsson2023transporting].
+Empirical investigations often involve two key populations: the target and study populations. Ideally, these populations align perfectly, but achieving this alignment is challenging. Predictive model construction, based on the study population but intended for the target population, faces challenges due to discrepancies in their characteristics. Such disparities can compromise the model's efficacy when applied to the target population. Therefore, evaluating predictive accuracy alone is insufficient; transportability analysis is crucial [@steingrimsson2023transporting].
 
 To underscore the significance of transportability analysis, we draw upon datasets derived from two disparate sources: The Framingham Study and the National Health & Nutrition Examination Survey (NHANES). Initiated by the United States Public Health Service in 1948, the Framingham Study represents an extensive observational cohort investigation dedicated to exploring the epidemiology and risk factors associated with cardiovascular disease (CVD). Evolving into a longitudinal study spanning three generations, this initiative meticulously captures data pertaining to biological and lifestyle risk factors, alongside monitoring cardiovascular, neurological, and other disease outcomes [@Framingham].
 
@@ -38,7 +40,7 @@ The inaugural cohort of the Framingham Study comprised 5,209 participants aged 2
 
 In contrast, the NHANES, administered by the National Center for Health Statistics (NCHS), constitutes a program of studies aimed at evaluating the health and nutritional status of both adults and children in the United States. A continuous program with evolving focal points to address contemporary needs, NHANES integrates self-reported data on demographic, socioeconomic, dietary, and health-related factors. Furthermore, it encompasses a comprehensive examination entailing medical, dental, and psychological metrics [@nhanes].
 
-The Framingham Study, being a longitudinal exploration enriched with cardiovascular outcome data, facilitates the construction of models predicting an individual's predisposition to cardiovascular disease (CVD). Conversely, the NHANES data lacks information on cardiovascular outcomes. In this context, the pivotal inquiry emerges: To what extent can we prognosticate the likelihood of cardiovascular disease in the NHANES population utilizing a model constructed on the Framingham data?
+The Framingham Study, rich in cardiovascular outcome data, enables the construction of models predicting predisposition to cardiovascular disease (CVD). However, NHANES lacks cardiovascular outcome information. This raises a key question: Can we predict the likelihood of cardiovascular disease in the NHANES population using a model built on Framingham data?
 
 ```{r framingham_data}
 # Load in packages
@@ -47,8 +49,8 @@ library(tidyverse)
 library(tableone)
 library(kableExtra)
 library(comprehenr)
+library(gridExtra)
 
-# Pre-processing for Framingham data
 data("framingham")
 
 # The Framingham data has been used to create models for cardiovascular risk.
@@ -81,7 +83,6 @@ framingham_df_men <- framingham_df %>% filter(SEX == 1)
 framingham_df_women <- framingham_df %>% filter(SEX == 2)
 
 # Fit models with log transforms for all continuous variables
-# Log transforms - data is skewed otherwise
 mod_men <- glm(CVD~log(HDLC)+log(TOTCHOL)+log(AGE)+log(SYSBP_UT+1)+
                  log(SYSBP_T+1)+CURSMOKE+DIABETES, 
       data= framingham_df_men, family= "binomial")
@@ -93,37 +94,42 @@ mod_women <- glm(CVD~log(HDLC)+log(TOTCHOL)+log(AGE)+log(SYSBP_UT+1)+
 ```
 
 ```{r nhanes_data}
+# The NHANES data here finds the same covariates among this national survey data
 library(nhanesA)
-# NHANES data pre-processing
+
 # blood pressure, demographic, bmi, smoking, and hypertension info
 bpx_2017 <- nhanes("BPX_J") %>% 
-  select(SEQN, BPXSY1, BPXDI1) %>% 
+  dplyr::select(SEQN, BPXSY1, BPXDI1) %>% 
   rename(SYSBP = BPXSY1, DIABP = BPXDI1)
 demo_2017 <- nhanes("DEMO_J") %>% 
-  select(SEQN, RIAGENDR, RIDAGEYR) %>% 
+  dplyr::select(SEQN, RIAGENDR, RIDAGEYR) %>% 
   rename(SEX = RIAGENDR, AGE = RIDAGEYR)
 bmx_2017 <- nhanes("BMX_J") %>% 
-  select(SEQN, BMXBMI) %>% 
+  dplyr::select(SEQN, BMXBMI) %>% 
   rename(BMI = BMXBMI)
 smq_2017 <- nhanes("SMQ_J") %>%
   mutate(CURSMOKE = case_when(SMQ040 %in% c(1,2) ~ 1,
                               SMQ040 == 3 ~ 0, 
                               SMQ020 == 2 ~ 0)) %>%
-  select(SEQN, CURSMOKE)
+  dplyr::select(SEQN, CURSMOKE)
 bpq_2017 <- nhanes("BPQ_J") %>% 
-  mutate(BPMEDS = ifelse(BPQ050A == 1, 1, 0)) %>%
-  select(SEQN, BPMEDS) 
+  mutate(BPMEDS = case_when(
+    BPQ020 == 2 ~ 0,
+    BPQ040A == 2 ~ 0,
+    BPQ050A == 1 ~ 1,
+    TRUE ~ NA )) %>%
+  dplyr::select(SEQN, BPMEDS) 
 tchol_2017 <- nhanes("TCHOL_J") %>% 
-  select(SEQN, LBXTC) %>% 
+  dplyr::select(SEQN, LBXTC) %>% 
   rename(TOTCHOL = LBXTC)
 hdl_2017 <- nhanes("HDL_J") %>% 
-  select(SEQN, LBDHDD) %>% 
+  dplyr::select(SEQN, LBDHDD) %>% 
   rename(HDLC = LBDHDD)
 diq_2017 <- nhanes("DIQ_J") %>% 
   mutate(DIABETES = case_when(DIQ010 == 1 ~ 1, 
                               DIQ010 %in% c(2,3) ~ 0, 
                               TRUE ~ NA)) %>%
-  select(SEQN, DIABETES) 
+  dplyr::select(SEQN, DIABETES) 
 
 # Join data from different tables
 df_2017 <- bpx_2017 %>%
@@ -142,7 +148,7 @@ df_2017 <- bpx_2017 %>%
 
 Preceding the commencement of the transportability analysis, an exploratory data analysis was undertaken. The interrelations among numeric columns within the NHANES data are illustrated in Figure 1. It is discerned that systolic blood pressure exhibits a pronounced correlation with age, diastolic blood pressure, and body mass index (BMI). Furthermore, a notable correlation is observed between total cholesterol and systolic blood pressure, along with high-density lipoprotein cholesterol (HDLC).
 
-```{r, fig.height = 4}
+```{r, fig.height = 3, fig.align='center'}
 library(corrplot)
 numeric_nhanes <- df_2017 %>%
   dplyr::select(SYSBP, DIABP, AGE, BMI, HDLC, TOTCHOL)
@@ -150,28 +156,30 @@ numeric_nhanes <- numeric_nhanes[complete.cases(numeric_nhanes),]
 corrplot(cor(numeric_nhanes),
          type = 'lower',
          method = 'square',
-         tl.col = 'black')
+         tl.col = 'black',
+         cl.cex = 0.4)
 ```
 
-### Figure 1. Correlation Plot for NHANES Data
+**Figure 1. Correlation Plot for NHANES Data**
 
 In Figure 2, the inter-column correlations within the numeric variables of the Framingham data are presented. Notably, akin to the NHANES data, discernible correlations are evident between systolic blood pressure and diastolic blood pressure, age, and BMI. However, it is noteworthy that the strength of correlations for other variables in the Framingham data appears comparatively less pronounced than those observed in the NHANES dataset. This discrepancy underscores a substantive distinction between the two datasets.
 
-```{r, fig.height = 4}
+```{r, fig.height = 3, fig.align = 'center'}
 numeric_fram <- framingham_df %>%
   dplyr::select(SYSBP, DIABP, AGE, BMI, HDLC, TOTCHOL)
 numeric_fram <- numeric_fram[complete.cases(numeric_fram),]
 corrplot(cor(numeric_fram),
          type = 'lower',
          method = 'square',
-         tl.col = 'black')
+         tl.col = 'black',
+         cl.cex = 0.4)
 ```
 
-### Figure 2. Correlation Plot for Framingham Data
+**Figure 2. Correlation Plot for Framingham Data**
 
-Within the Framingham dataset, an absence of missing data is apparent. Conversely, the NHANES dataset manifests several columns harboring a discernible volume of missing observations, as depicted in Table 1. Notably, a conspicuous pattern emerges wherein the absence of data in the HDLC variable corresponds to missing observations in total cholesterol, and vice versa. Similarly, the absence of systolic blood pressure data coincides with missing data in diastolic blood pressure. Although no other overt patterns are evident, it is imperative to highlight the substantial number of missing observations within the blood pressure medication column.
+In the Framingham dataset, there is no missing data. Conversely, the NHANES dataset manifests several columns with a noticeable amount of missing observations, as depicted in Table 1. A clear pattern emerges: missing HDLC data aligns with missing total cholesterol data, and vice versa. Similarly, missing systolic blood pressure data coincides with missing diastolic blood pressure data. While no other clear patterns are evident, it is crucial to note the substantial number of missing observations in the blood pressure medication column.
 
-The ramifications of this observation become evident when considering Table 1; a focus solely on complete cases within the dataset would result in a significant loss of information. Specifically, a mere 1,480 complete observations stand in stark contrast to the 9,254 observations comprising the entire dataset. This underscores the importance of addressing missing data systematically, as reliance solely on complete cases may entail a notable sacrifice of valuable information inherent in the dataset.
+Considering Table 1, focusing solely on complete cases would result in a significant loss of information. There are only 1,480 complete observations compared to the 9,254 observations in the entire dataset. This emphasizes the importance of addressing missing data systematically, as relying only on complete cases could mean sacrificing valuable information in the dataset.
 
 ```{r}
 # Patterns of Missingness
@@ -184,16 +192,16 @@ kbl(missing_2017, booktabs = T, escape = F, caption = 'Number of Missing Values 
   kable_styling(latex_options = "HOLD_position")
 ```
 
-Table 2 presents a comprehensive summary of data pertaining to male participants from both the Framingham and NHANES studies, while Table 3 provides an analogous summary for female participants. Notably, both tables accentuate pivotal distinctions inherent in the cohorts under scrutiny. Specifically, a greater prevalence of individuals in the NHANES dataset is observed to be under blood pressure medication, afflicted with diabetes, or exhibiting elevated body mass index (BMI). In contrast, discernible characteristics within the Framingham population encompass a comparatively advanced mean age and elevated cholesterol levels.
+Table 2 provides a comprehensive summary of data related to male participants from both the Framingham and NHANES studies, while Table 3 offers a similar summary for female participants. Notably, both tables highlight significant differences in the cohorts under scrutiny. Specifically, the NHANES dataset shows a higher prevalence of individuals under blood pressure medication, with diabetes, or exhibiting elevated body mass index (BMI). In contrast, notable characteristics within the Framingham population include a comparatively advanced mean age and elevated cholesterol levels.
 
-These population disparities assume significance as they elucidate potential factors contributing to divergent model performances across datasets. Specifically, the discerned dissimilarities underscore the imprudence of extrapolating the performance of a model trained on one dataset, exemplified by the Framingham data, to another distinct dataset, such as NHANES. The age-related variations, differences in health conditions, and divergent anthropometric profiles between the populations underscore the necessity for meticulous transportability analysis. Such analysis becomes imperative to glean insights into the generalizability of models derived from one population to another with disparate demographic and clinical characteristics.
+These population differences are significant as they explain potential factors contributing to varying model performances across datasets. In particular, the observed dissimilarities emphasize the imprudence of extrapolating the performance of a model trained on one dataset (Framingham) to another distinct dataset (NHANES). The variations in age, health conditions, and other biological metrics between the populations underscore the necessity for meticulous transportability analysis. Such analysis becomes imperative to gain insights into the generalizability of models derived from one population to another with disparate demographic and clinical characteristics.
 
 ```{r summary_table}
 library(gtsummary)
 
 complete_cases <- df_2017[complete.cases(df_2017),]
 eligible_2017 <- complete_cases %>%
-  filter(AGE >= 28 & AGE <= 62) %>%
+  filter(AGE >= 30) %>%
   dplyr::select(c("SEX", "TOTCHOL", "AGE", "BMI", "SYSBP", "HDLC", 
            "CURSMOKE", "BPMEDS", "DIABETES", "DIABP"))
 
@@ -210,7 +218,6 @@ framingham_df <- framingham_df %>%
            "SYSBP_T", "DIABP"))
 
 final_df <- rbind(framingham_df, eligible_2017)
-
 final_df <- final_df %>%
   mutate(S = case_when(is.na(CVD) ~ 0,
                        TRUE ~ 1))
@@ -291,7 +298,7 @@ $$
 
 [@steingrimsson2023transporting].
 
-Given the substantial amount of missing data within the NHANES dataset, multiple imputation techniques were employed. Five imputed datasets were generated, and for each of these datasets, individuals not meeting the criteria of the Framingham study were filtered out. Subsequently, the Brier score was computed for each filtered dataset, and these values were averaged to yield the gender-specific average Brier scores, as detailed in Table 4.
+Given the substantial amount of missing data within the NHANES dataset, multiple imputation techniques were employed. Five imputed datasets were generated, and for each of these datasets, individuals not meeting the criteria of the Framingham study (specifically, aged 30+) were filtered out. Subsequently, the Brier score was computed for each filtered dataset, and these values were averaged to yield the gender-specific average Brier scores, as detailed in Table 4.
 
 ```{r brier_score}
 library(mice)
@@ -308,6 +315,7 @@ calculate_weights <- function(data) {
 #' @return vector of weights
 
   model <- glm(S ~ ., data = data, family = "binomial")
+  #log(HDLC)+log(TOTCHOL)+log(AGE)+log(SYSBP_UT+1)+log(SYSBP_T+1)+CURSMOKE+DIABETES
   S1 <- predict(model, type = "response")
   
   return((1-S1)/S1)
@@ -351,19 +359,19 @@ for (i in 1:m) {
   
   data <- complete(mice_data_out, i)
   data <- data %>%
-    filter(AGE >= 28 & AGE <= 62) %>%
-    select(c("SEX", "TOTCHOL", "AGE", "BMI", "SYSBP", "HDLC", 
+    filter(AGE >= 30) %>%
+    dplyr::select(c("SEX", "TOTCHOL", "AGE", "BMI", "SYSBP", "HDLC", 
            "CURSMOKE", "BPMEDS", "DIABETES", "DIABP"))
   data$CVD <- NA
   
   data$SYSBP_UT <- ifelse(data$BPMEDS == 0, data$SYSBP, 0)
-  data$SYSBP_T <- ifelse(data$BPMEDS ==1, data$SYSBP, 0)
+  data$SYSBP_T <- ifelse(data$BPMEDS == 1, data$SYSBP, 0)
   
   combined_df <- rbind(framingham_df, data) %>%
     mutate(S = case_when(is.na(CVD) ~ 0,
-                       TRUE ~ 1))
+                       !(is.na(CVD)) ~ 1))
   
-  weights <- calculate_weights(combined_df %>% select(-CVD))
+  weights <- calculate_weights(combined_df %>% dplyr::select(-c(CVD, SEX, DIABP)))
   combined_df <- cbind(combined_df, weights)
   
   scores_male <- c(scores_male, brier_score(combined_df, 1))
@@ -386,7 +394,39 @@ The ADEMP framework, an invaluable tool for conceptualizing simulation challenge
 
 **Aims:** The objective of this endeavor is to employ summary-level data adeptly to simulate individual-level data representative of our target population, constituting the demographic substratum underpinning the NHANES survey data.
 
-**Data Generating Mechanism:** Data generation was dichotomized by gender, maintaining a uniform procedural methodology with divergent parameter values. Notably, the interdependence between HDLC and cholesterol prompted their simulation through a multivariate normal distribution, allowing for varied associations. Age, characterized by a uniform distribution within the range of 28 to 62, was generated accordingly. The systolic blood pressure, despite exhibiting a subtle skewness, was represented through a normal distribution model. The binary variable for smoking was modeled using a binomial distribution, employing probabilities extracted from summary tables. The variable denoting blood pressure medication usage was contingent on varying systolic blood pressure thresholds, ranging from 120 to 140, referencing criteria elucidated by the Mayo Clinic [@mayo]. A predictive model for diabetes, predicated on age, HDLC, and blood pressure medication status, was constructed employing NHANES data and subsequently deployed to generate diabetes status for each data point. To circumvent computational constraints, 500 iterations were executed for each permutation of parameter variations. A seed of 1 was used.
+**Data Generating Mechanism:** Data generation was performed separately by gender. The methodology was the same for both genders, but there were different parameter values. The process is outlined in Figure 3.
+
+```{r, echo = FALSE, out.width ='100px', fig.align='center'}
+library(knitr)
+include_graphics('DGM.png')
+```
+
+**Figure 3: Data Generating Mechanism**
+
+Notably, the interdependence between HDLC and cholesterol prompted their simulation through a multivariate normal distribution, where the correlation between both variables was varied to find the optimal correlation. Age, as seen in Figure 4, seems to most closely follow a uniform distribution, so it was generated accordingly, with the range of distribution being between 30 and 80. Similarly, systolic blood pressure appears to roughly follow a normal distribution, so the variable was generated using the normal distribution, with distribution parameters being drawn from Table 2 and Table 3.
+
+The binary variable for smoking was modeled using a binomial distribution, with the probability of smoking being extracted from Table 2 and Table 3. The variable for blood pressure medication usage was generated based on systolic blood pressure. Varying thresholds were used for this; if the systolic blood pressure was larger than the threshold, the individual was simulated to be on blood pressure medication and conversely, if the blood pressure was less than the threshold, the individual was simulated to not be on blood pressure medication. These varying thresholds ranged from 120 to 140, which was determined based on the criteria for elevated blood pressure and hypertension as provided by the Mayo Clinic [@mayo].
+
+For diabetes, a predictive model was built on the Framingham data, with age, HDLC, and blood pressure medication status being used as predictors. The predicted probabilities from this model was used as the probability parameter in the binomial distribution used to generate this variable. To handle computational constraints, 500 iterations were executed for each permutation of parameter variations. A seed of 1 was used for replicability of results.
+
+```{r, fig.height = 3.5}
+# Age histogram
+age <- ggplot(eligible_2017) + 
+  geom_histogram(aes(x = AGE), color = "black", fill = "white") +
+  labs(title = 'Distribution of Age',
+       x = 'Age',
+       y = 'Count')
+# SYSBP histogram
+sysbp <- ggplot(eligible_2017) +
+  geom_histogram(aes(x = SYSBP), color = "black", fill = "white") +
+  labs(title = 'Distribution of Systolic Blood Pressure',
+       x = 'Systolic Blood Pressure',
+       y = 'Count')
+
+grid.arrange(age, sysbp, nrow = 2, ncol = 1)
+```
+
+**Figure 4: Distribution of Age and Systolic Blood Pressure**
 
 **Estimand:** The estimand, denoted as $\hat{\psi}_{\hat{\beta}}$, assumes the form of the Brier Risk estimator, serving as a metric to gauge model performance within the target population.
 
@@ -396,20 +436,54 @@ The ADEMP framework, an invaluable tool for conceptualizing simulation challenge
 
 ### Results
 
-The evaluation of simulated datasets entailed the application of two distinct metrics: bias and mean squared error (MSE). Although the discrepancies in bias across covariance values exhibited a relatively modest amplitude, Figure 3 provides valuable insights into the covariance values, elucidating the relationship between total cholesterol and high-density lipoprotein cholesterol (HDLC), which yield the least bias, on average. Specifically, for the male cohort, the minimum bias is observed at a covariance value of 1, whereas for the female cohort, the minimum bias is observed at a covariance value of 5.
+The evaluation of simulated datasets entailed the application of two distinct metrics: bias and mean squared error (MSE). The discrepancies in bias and MSE across different correlation values are more pronounced for men, though still relatively small with lower correlations. As the total cholesterol and HDLC become more correlated, the bias and MSE increase, as seen in Figure 5. We are also able to determine that the $\rho$ that results in the least amount of bias is 0.4 for both genders.
 
-Regarding MSE, analogous marginal variations in bias are observed. Notably, the estimated Brier score in the simulated data demonstrates a more pronounced deviation from the actual Brier score in the male dataset compared to the female dataset. A meticulous examination of Figure 4 reveals that, congruent with the bias findings in Figure 3, the optimal covariance values for minimizing MSE align at 1 for men and 5 for women.
+Similarly, we are also able to see the average bias and MSE across the different blood pressure thresholds. For both metrics, a similar trend is observed, where they are closer to the true Brier score as the threshold increases. However, the decrease in error appears to be more pronounced for men than women. An examination of this figure reveals that the best blood pressure threshold is 140 for both genders.
 
-```{r, fig.height=8}
+```{r, fig.height = 6.5, fig.align='center'}
 library(MASS)
-library(gridExtra)
+library(ghibli)
 
-sim_men <- readRDS('sim_results_men.rds')
-sim_women <- readRDS('sim_results_women.rds')
+sim_men <- readRDS('sim_results_men_1.rds')
+sim_women <- readRDS('sim_results_women_1.rds')
+
 
 est_men <- mean(scores_male)
+x <- sim_men %>% 
+  group_by(rho, thresh) %>% 
+  summarise(bias = mean(brier - est_men)) %>%
+  ungroup() %>%
+  slice_min(abs(bias), n = 1)
+
+est_women <- mean(scores_female)
+y <- sim_women %>% 
+  group_by(rho, thresh) %>% 
+  summarise(bias = mean(brier - est_men)) %>%
+  ungroup() %>%
+  slice_min(abs(bias), n = 1)
+
+#sim_men %>% filter(rho == 0.4, thresh == 140) %>% summarise(mean(brier))
+
+
+
+brier_men <- ggplot(sim_men %>% filter(rho == 0.4, thresh == 140)) +
+  geom_line(aes(x = iter, y = brier)) +
+  geom_hline(yintercept=est_men, linetype="dashed", 
+                color = "red", size=2) +
+  labs(title = 'Brier Score by Iteration',
+       x = 'Iteration',
+       y = 'Brier Score')
+
+brier_women <- ggplot(sim_women %>% filter(rho == 0.4, thresh == 140)) +
+  geom_line(aes(x = iter, y = brier)) +
+  geom_hline(yintercept=est_women, linetype="dashed", 
+                color = "red", size=2) +
+  labs(title = 'Brier Score by Iteration',
+       x = 'Iteration',
+       y = 'Brier Score')
+
 sim_men_scores <- sim_men %>%
-  group_by(cov,thresh) %>%
+  group_by(rho,thresh) %>%
   summarise(brier = mean(brier),
             bias = mean(brier - est_men),
             MSE = mean((brier - est_men)^2))
@@ -417,138 +491,186 @@ sim_men_scores <- sim_men %>%
 
 est_women <- mean(scores_female)
 sim_women_scores <- sim_women %>%
-  group_by(cov,thresh) %>%
+  group_by(rho,thresh) %>%
   summarise(brier = mean(brier),
             bias = mean(brier - est_women),
             MSE = mean((brier - est_women)^2))
 
-best_cov_m <- sim_men_scores %>% 
-  group_by(cov) %>% 
+best_cor_m <- sim_men_scores %>%
+  group_by(rho) %>%
   summarise(avg_brier = mean(brier),
             avg_bias = mean(bias),
-            avg_MSE = mean(MSE))
+            ymin = avg_bias - sd(bias),
+            ymax = avg_bias + sd(bias),
+            avg_MSE = mean(MSE),
+            min_MSE = avg_MSE - sd(MSE),
+            max_MSE = avg_MSE + sd(MSE))
+best_cor_m$sex <- 'Male'
 
-best_cov_w <- sim_women_scores %>% 
-  group_by(cov) %>% 
+best_cor_w <- sim_women_scores %>%
+  group_by(rho) %>%
   summarise(avg_brier = mean(brier),
             avg_bias = mean(bias),
-            avg_MSE = mean(MSE))
+            ymin = avg_bias - sd(bias),
+            ymax = avg_bias + sd(bias),
+            avg_MSE = mean(MSE),
+            min_MSE = avg_MSE - sd(MSE),
+            max_MSE = avg_MSE + sd(MSE))
+best_cor_w$sex <- 'Female'
+
+best_cor <- rbind(best_cor_m, best_cor_w)
 
 
-p1 <- ggplot(best_cov_m) +
-  geom_line(aes(x = cov, y = avg_bias), col = "black") +
-  geom_point(aes(x = cov, y = avg_bias), col = "black") +
-  scale_x_continuous(n.breaks = 10) +
-  labs(title = 'Average Bias by Covariance (Men)',
-       x = 'Covariance',
-       y = 'Average Bias') +
-  theme_minimal()
-
-p2 <- ggplot(best_cov_w) +
-  geom_line(aes(x = cov, y = avg_bias), col = "black") +
-  geom_point(aes(x = cov, y = avg_bias), col = "black") +
-  scale_x_continuous(n.breaks = 10) +
-  labs(title = 'Average Bias by Covariance (Women)',
-       x = 'Covariance',
-       y = 'Average Bias') +
-  theme_minimal()
-
-grid.arrange(p1,p2, nrow=2, ncol = 1)
-
-p3 <- ggplot(best_cov_m) +
-  geom_line(aes(x = cov, y = avg_MSE), col = "black") +
-  geom_point(aes(x = cov, y = avg_MSE), col = "black") +
-  scale_x_continuous(n.breaks = 10) +
-  labs(title = 'Average MSE by Covariance (Men)',
-       x = 'Covariance',
-       y = 'Average MSE') +
-  theme_minimal()
-
-p4 <- ggplot(best_cov_w) +
-  geom_line(aes(x = cov, y = avg_MSE), col = "black") +
-  geom_point(aes(x = cov, y = avg_MSE), col = "black") +
-  scale_x_continuous(n.breaks = 10) +
-  labs(title = 'Average MSE by Covariance (Women)',
-       x = 'Covariance',
-       y = 'Average MSE') +
-  theme_minimal()
-```
-
-### Figure 3. Biases for Men and Women by Covariance Values
-
-```{r, fig.height = 8}
-grid.arrange(p3,p4, nrow=2, ncol = 1)
-```
-
-### Figure 4. Mean Squared Errors for Men and Women by Covariance Values
-
-Furthermore, we sought to elucidate the influence of varying thresholds in delineating eligibility for blood pressure medication on the absolute bias. This investigation is depicted in Figure 5. The bias, under the conditions where the covariance was fixed at the optimal values previously identified for each gender, was systematically charted across the spectrum of conceivable thresholds.
-
-Observationally, for the female cohort, the bias showcases minimal fluctuations irrespective of the threshold values. Conversely, a discernible trend emerges indicating that a lower threshold yields a diminished absolute bias, on average, compared to a higher threshold. In contradistinction, the male cohort exhibits a more pronounced sensitivity to the chosen thresholds. Notably, a threshold of 135 results in a near absence of bias, signifying a notable impact on the absolute bias relative to alternate threshold values.
-
-```{r}
-library(wesanderson)
-best_thresh_m <- sim_men_scores %>% 
-  filter(cov == 1) %>%
-  group_by(thresh) %>% 
+best_thresh_m <- sim_men_scores %>%
+  group_by(thresh) %>%
   summarise(avg_brier = mean(brier),
             avg_bias = mean(bias),
-            avg_MSE = mean(MSE))
+            ymin = avg_bias - sd(bias),
+            ymax = avg_bias + sd(bias),
+            avg_MSE = mean(MSE),
+            min_MSE = avg_MSE - sd(MSE),
+            max_MSE = avg_MSE + sd(MSE))
+best_thresh_m$sex <- 'Male'
 
-best_thresh_w <- sim_women_scores %>% 
-  filter(cov == 5) %>%
-  group_by(thresh) %>% 
+best_thresh_w <- sim_women_scores %>%
+  group_by(thresh) %>%
   summarise(avg_brier = mean(brier),
             avg_bias = mean(bias),
-            avg_MSE = mean(MSE))
-
-best_thresh_m$sex = 1
-best_thresh_w$sex = 2
+            ymin = avg_bias - sd(bias),
+            ymax = avg_bias + sd(bias),
+            avg_MSE = mean(MSE),
+            min_MSE = avg_MSE - sd(MSE),
+            max_MSE = avg_MSE + sd(MSE))
+best_thresh_w$sex <- 'Female'
 
 best_thresh <- rbind(best_thresh_m, best_thresh_w)
 
-ggplot(best_thresh) +
-  geom_line(aes(x = thresh, y = abs(avg_bias), col = as.factor(sex))) +
-  geom_point(aes(x = thresh, y = abs(avg_bias), col = as.factor(sex))) +
-  scale_color_manual(values = c('1' = wes_palette('GrandBudapest2')[2],
-                                '2' = wes_palette('GrandBudapest2')[4]),
-                     labels = c('Male', 'Female')) +
-  labs(title = 'Bias by BP Medication Threshold',
-       col = 'Sex',
-       x = 'Threshold',
-       y = 'Average Absolute Bias') +
+
+cor_bias_plot <- ggplot(best_cor, aes(x = rho, y = avg_bias, color = sex)) +
+  geom_line() +
+  geom_point() +
+  geom_errorbar(aes(ymin=ymin, ymax=ymax), width=.05,
+                 position=position_dodge(0.0)) +
+  scale_x_continuous(n.breaks = 10) +
+  scale_color_manual(name = 'Sex', labels = c('Female',
+                                              'Male'),
+                      values = ghibli_palette('LaputaMedium')[c(3,6)]) +
+  labs(title = 'Average Bias by Correlation',
+       x = 'Correlation',
+       y = 'Average Bias') +
   theme_minimal()
+
+thresh_bias_plot <- ggplot(best_thresh, aes(x = thresh, y = avg_bias, color = sex)) +
+  geom_line() +
+  geom_point() +
+  geom_errorbar(aes(ymin=ymin, ymax=ymax), width=.05,
+                 position=position_dodge(0.0)) +
+  scale_x_continuous(n.breaks = 5) +
+  scale_color_manual(name = 'Sex', labels = c('Female',
+                                              'Male'),
+                      values = ghibli_palette('LaputaMedium')[c(3,6)]) +
+  labs(title = 'Average Bias by BP Threshold',
+       x = 'BP Threshold',
+       y = 'Average Bias') +
+  theme_minimal()
+
+cor_MSE_plot <- ggplot(best_cor, aes(x = rho, y = avg_MSE, color = sex)) +
+  geom_line() +
+  geom_point() +
+  geom_errorbar(aes(ymin=min_MSE, ymax=max_MSE), width=.05,
+                 position=position_dodge(0.0)) +
+  scale_x_continuous(n.breaks = 10) +
+  scale_color_manual(name = 'Sex', labels = c('Female',
+                                              'Male'),
+                      values = ghibli_palette('LaputaMedium')[c(3,6)]) +
+  labs(title = 'Average MSE by Correlation',
+       x = 'Correlation',
+       y = 'Average MSE') +
+  theme_minimal()
+
+thresh_MSE_plot <- ggplot(best_thresh, aes(x = thresh, y = avg_MSE, color = sex)) +
+  geom_line() +
+  geom_point() +
+  geom_errorbar(aes(ymin=min_MSE, ymax=max_MSE), width=.05,
+                 position=position_dodge(0.0)) +
+  scale_x_continuous(n.breaks = 5) +
+  scale_color_manual(name = 'Sex', labels = c('Female',
+                                              'Male'),
+                      values = ghibli_palette('LaputaMedium')[c(3,6)]) +
+  labs(title = 'Average MSE by BP Threshold',
+       x = 'BP Threshold',
+       y = 'Average MSE') +
+  theme_minimal()
+
+grid.arrange(cor_bias_plot, cor_MSE_plot, thresh_bias_plot, thresh_MSE_plot, 
+             nrow = 4, ncol = 1)
 ```
 
-### Figure 5. Biases for Men and Women by Threshold Values
+**Figure 5. Average Bias and MSE by Correlation and Threshold**
 
-Employing the previously established covariance and parameter thresholds, the dataset underwent simulation, and subsequently, the Brier score was computed. Additionally, comprehensive summary tables of the simulated data were generated, facilitating a comparative analysis of its congruence with the summary tables integral to the initial data generation process.
+With the optimal parameters ($\rho = 0.4$ and a blood pressure threshold of 140), the Brier score across all 500 iterations was plotted in Figure 6. The red line in both plots delineates the actual Brier score value for each gender. From Figure 6, we are able to see that the Brier scores for the simulated female data seem to oscillate around the true value. This is indicative that the simulated female data is able to replicate the behavior of the underlying NHANES population accurately.
+
+On the other hand, we see that the simulated male data oscillates around a Brier score of 0.15, which is approximately 0.06 from the true Brier score value. This indicates that the simulated male data is not an accurate representation of the underlying NHANES population, and therefore, more alterations to the data generating mechanism need to be made. That being said, this margin of error is not too substantial.
 
 ```{r}
+grid.arrange(brier_men, brier_women, nrow = 2, ncol = 1)
+```
+
+**Figure 6. Average Brier Score by Iteration with Best Parameters For Men (Top) and Women (Bottom)**
+
+Employing the previously defined correlation and blood pressure threshold values, the dataset underwent simulation (using seed 1), and subsequently, the Brier score was computed. Additionally, comprehensive summary tables of the simulated data were generated, facilitating a comparative analysis of its congruence with the summary tables used in the initial data generation process.
+
+From Table 5, we are able to see that the Brier score for the female data is very close to the true Brier score, which corroborates what is illustrated in Figure 6. Similarly, the Brier score for the male data performs slightly worse. Upon examination of the summary statistics for the simulated data, as shown in Table 6, we see that the prevalence of blood pressure medication and diabetes are significantly lower in the simulated data than in the actual data.
+
+```{r}
+set.seed(1)
+cov_mat <- function(sd1, sd2, rho) {
+  
+  cov_mat = matrix(0, nrow = 2, ncol = 2)
+  cov_mat[1,1] <- sd1^2
+  cov_mat[1,2] <- rho * sd1 * sd2
+  cov_mat[2,1] <- rho * sd1 * sd2
+  cov_mat[2,2] <- sd2^2 
+  
+  return(cov_mat)
+  
+}
 diabetes_mod <- readRDS('diabetes_mod.rds')
 
-n_m <- 1500
-n_w <- 1680
+nhanes_men <- eligible_2017 %>% filter(AGE >= 30 & SEX == 1)
+nhanes_women <- eligible_2017 %>% filter(AGE >= 30 & SEX == 2)
 
-chol_var_m <- mvrnorm(n_m, mu = c(46, 186), Sigma = matrix(c(15^2, 1, 1, 43^2), 2, 2))
-chol_var_w <- mvrnorm(n_w, mu = c(56, 201), Sigma = matrix(c(17^2, 5, 5, 41^2), 2, 2))
+n_m <- nrow(nhanes_men)
+n_w <- nrow(nhanes_women)
+
+mean_m <- as.data.frame(t(apply(X = nhanes_men, MARGIN = 2, FUN = mean)))
+sd_m <- as.data.frame(t(apply(X = nhanes_men, MARGIN = 2, FUN = sd)))
+
+mean_w <- as.data.frame(t(apply(X = nhanes_women, MARGIN = 2, FUN = mean)))
+sd_w <- as.data.frame(t(apply(X = nhanes_women, MARGIN = 2, FUN = sd)))
+
+cov_matrix_m <- cov_mat(sd_m$HDLC, sd_m$TOTCHOL, 0.4)
+cov_matrix_w <- cov_mat(sd_w$HDLC, sd_w$TOTCHOL, 0.4)
+
+chol_var_m <- mvrnorm(n_m, mu = c(mean_m$HDLC, mean_m$TOTCHOL), Sigma = cov_matrix_m)
+chol_var_w <- mvrnorm(n_w, mu = c(mean_w$HDLC, mean_w$TOTCHOL), Sigma = cov_matrix_w)
   
 HDLC_m <- chol_var_m[,1]
 TOTCHOL_m <- chol_var_m[,2]
 HDLC_w <- chol_var_w[,1]
 TOTCHOL_w <- chol_var_w[,2]
 
-SYSBP_m <- rnorm(n_m, 118, 20)
-SYSBP_w <- rnorm(n_w, 134, 20)
+SYSBP_m <- rnorm(n_m, mean_m$SYSBP, sd_m$SYSBP)
+SYSBP_w <- rnorm(n_w, mean_w$SYSBP, sd_w$SYSBP)
 
-AGE_m <- round(runif(n_m, 28, 62))
-AGE_w <- round(runif(n_w, 28, 62))
+AGE_m <- round(runif(n_m, 30, 80))
+AGE_w <- round(runif(n_w, 30, 80))
 
-BP_MEDS_m <- as.numeric(SYSBP_m >= 135)
-BP_MEDS_w <- as.numeric(SYSBP_w >= 120)
+BP_MEDS_m <- as.numeric(SYSBP_m >= 140)
+BP_MEDS_w <- as.numeric(SYSBP_w >= 140)
 
-CURSMOKE_m <- rbinom(n_m, 1, 0.25)
-CURSMOKE_w <- rbinom(n_w, 1, 0.19)
+CURSMOKE_m <- rbinom(n_m, 1, mean_m$CURSMOKE)
+CURSMOKE_w <- rbinom(n_w, 1, mean_m$CURSMOKE)
 
 SEX_m <- rep(1, n_m)
 SEX_w <- rep(2, n_w)
@@ -588,16 +710,18 @@ combined_df <- cbind(combined_df, weights)
 score_male <- brier_score(combined_df, 1)
 score_female <- brier_score(combined_df, 2)
 
-brier_scores_sim <- data.frame(brier = c(score_male, score_female))
-colnames(brier_scores_sim) <- c('Brier Score')
+brier_scores_sim <- data.frame(brier = c(score_male, score_female), true = c(est_men, est_women))
+colnames(brier_scores_sim) <- c('Simulated Brier Score', 'True Brier Score')
 rownames(brier_scores_sim) <- c('Male', 'Female')
-kbl(brier_scores_sim, booktabs = T, escape = F, caption = 'Brier Scores of Best Simulated Data') %>%
+kbl(brier_scores_sim, booktabs = T, escape = F, caption = 'Brier Scores of Best Simulated Data Compared to True Brier Score') %>%
   kable_styling(latex_options = 'HOLD_position')
 ```
 
 ```{r}
-data_m %>%
-  tbl_summary(include = c(TOTCHOL, AGE, SYSBP, HDLC, CURSMOKE, BPMEDS, DIABETES),
+data %>%
+  mutate(SEX = case_when(SEX == 1 ~ 'Male',
+                         SEX == 2 ~ 'Female')) %>%
+  tbl_summary(by = SEX, include = c(TOTCHOL, AGE, SYSBP, HDLC, CURSMOKE, BPMEDS, DIABETES),
               statistic = list(all_continuous() ~ "{mean} ({sd})"),
               label = c(TOTCHOL ~ 'Total Cholesterol',
                         AGE ~ 'Age',
@@ -608,28 +732,16 @@ data_m %>%
                         DIABETES ~ 'Diabetes'
                         )) %>%
   as_gt() %>%
-  gt::tab_header(title = "Table 6. Summary Statistics for Men")
-
-data_w %>%
-  tbl_summary(include = c(TOTCHOL, AGE, SYSBP, HDLC, CURSMOKE, BPMEDS, DIABETES),
-              statistic = list(all_continuous() ~ "{mean} ({sd})"),
-              label = c(TOTCHOL ~ 'Total Cholesterol',
-                        AGE ~ 'Age',
-                        SYSBP ~ 'Systolic Blood Pressure',
-                        HDLC ~ 'High Density Lipoprotein Cholesterol (HDLC)',
-                        CURSMOKE ~ 'Current Smoker',
-                        BPMEDS ~ 'Blood Pressure Medication',
-                        DIABETES ~ 'Diabetes'
-                        )) %>%
-  as_gt() %>%
-  gt::tab_header(title = "Table 7. Summary Statistics for Women")
+  gt::tab_header(title = "Table 6. Summary Statistics by Gender")
 ```
 
 ### Discussion
 
-As elucidated in Table 5, the Brier score exhibits a closer concordance with the actual Brier score derived from NHANES data for women than for men. Specifically, the Brier score for the simulated male dataset displays an approximate deviation of 0.11. While this discrepancy does not reach a magnitude considered substantial, its origin may be ascribed to the inherent variability within the dataset. Notably, the simulation procedure, relying on mean and standard deviation parameters, might inadequately address the potential influence of outliers or distributional skewness, thus contributing to this anticipated variance.
+As elucidated in Table 5, the Brier score exhibits a closer concordance with the actual Brier score derived from NHANES data for women than for men. Specifically, the Brier score for the simulated male dataset displays an approximate deviation of 0.03.
 
-Upon scrutinizing the summary statistics presented in both Table 6 and Table 7, a salient observation emerges. By employing the multivariate normal distribution for HDLC and total cholesterol, we successfully generated individual-level data in the simulated datasets that closely approximates the actual NHANES data for both genders. Nevertheless, discernible disparities between the simulated and actual datasets manifest, particularly concerning variables such as age, systolic blood pressure, and, notably, blood pressure medication usage within the male dataset.
+Upon scrutinizing the summary statistics presented in Table 6, a salient observation emerges. By employing the multivariate normal distribution for HDLC and total cholesterol, we successfully generated individual-level data in the simulated datasets that closely approximates the actual NHANES data for both genders. Nevertheless, discernible disparities between the simulated and actual datasets manifest, indicating potential avenues for improvement.
+
+Notably, the use of a blood pressure threshold might not be the only variable contributing to blood pressure medication status. Similarly, the model for diabetes, relying only on age, HDLC, and blood pressure medication, might need more predictors to accurately predict the probabilities of diabetes for each individual.
 
 ### Limitations & Future Research
 
