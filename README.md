@@ -21,6 +21,7 @@ The data generation process incorporates missing variables, potentially contribu
 - Project_Three.Rmd: the .Rmd file including all the code and text from the analysis.
 - Project_Three.pdf: the exported .pdf file.
 - references.bib: the references used in this analysis, in the BibTex format.
+- DGM.png: image outlining the data generating mechanism
 
 ## Acknowledgements:
 
