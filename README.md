@@ -15,8 +15,8 @@ The data generation process incorporates missing variables, potentially contribu
 ## Directory:
 - project3.R: the code outlining all the data pre-processing performed, as well as the initial EDA that did not make it into the final analysis.
 - simulation_code.R: the code where all the simulations were performed to determine the best parameters.
-- sim_results_men.rds: the simulation results for men.
-- sim_results_women.rds: the simulation results for women.
+- sim_results_men_1.rds: the simulation results for men.
+- sim_results_women_1.rds: the simulation results for women.
 - diabetes_mod.rds: the model used to determine the probability of an individual having diabetes.
 - Project_Three.Rmd: the .Rmd file including all the code and text from the analysis.
 - Project_Three.pdf: the exported .pdf file.
