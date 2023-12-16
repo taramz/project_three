@@ -2,3 +2,6 @@
 framingham_men.rds
 framingham_women.rds
 NHANES.rds
+.RData
+.Rhistory
+.DS_Store
